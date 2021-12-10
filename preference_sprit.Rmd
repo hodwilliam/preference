@@ -1,0 +1,63 @@
+---
+title: "preference"
+author: "hwilliam"
+date: "10/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(pdftools)
+library(tm)
+library(tidyverse)
+library(tokenizers)
+library(tidytext)
+library(topicmodels)
+```
+
+```{r}
+listdocpol <- list.files(pattern = "pdf$")
+```
+
+```{r}
+rm(list=ls())
+listdocpol <- list.files(pattern = "pdf$")
+dfinal_doc<- c()
+for (i in 1:length(listdocpol)) {
+  doc1<- pdf_text(listdocpol[i]) %>%
+    readr::read_lines()
+  df_doc1<- tibble(line = 1:length(doc1), text = doc1) %>% 
+  #df_doc1f<- df_doc1 %>%
+    unnest_tokens(word, text) %>% 
+    anti_join(get_stopwords(language = "fr")) %>%
+    filter(!str_detect(word, pattern = "[[:digit:]]"), # removes any words with numeric digits
+    !str_detect(word, pattern = "[[:punct:]]"), # removes any remaining punctuations
+    !str_detect(word, pattern = "(.)\\1{2,}"),  # removes any words with 3 or more repeated letters
+    !str_detect(word, pattern = "\\b(.)\\b")    # removes any remaining single letter words
+) %>% 
+    count(word)
+  fnclean = substr(listdocpol[i], start = 1, stop = nchar(listdocpol[i])-4)
+  df_doc1$filename<- fnclean
+  
+  dfinal_doc<-bind_rows(dfinal_doc, df_doc1)
+}
+
+```
+
+
+```{r}
+ 
+dtm10<- dfinal_doc %>% cast_dtm(filename, word, n)
+```
+
+```{r}
+ap_lda5 <- LDA(dtm10, k = 5, control = list(seed = 41616), method="VEM")
+macrotable<-terms(ap_lda5, k=10)
+stargazer(macrotable)
+```
+
